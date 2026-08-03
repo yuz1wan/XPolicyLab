@@ -11,12 +11,8 @@ from typing import Any, Literal, Protocol, TypeAlias
 
 import etils.epath as epath
 import flax.nnx as nnx
-from typing_extensions import override
-import tyro
-
 import openpi.models.model as _model
 import openpi.models.pi0_config as pi0_config
-import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.droid_policy as droid_policy
@@ -24,11 +20,11 @@ import openpi.policies.libero_policy as libero_policy
 import openpi.shared.download as _download
 import openpi.shared.normalize as _normalize
 import openpi.training.droid_rlds_dataset as droid_rlds_dataset
-import openpi.training.misc.polaris_config as polaris_config
-import openpi.training.misc.roboarena_config as roboarena_config
 import openpi.training.optimizer as _optimizer
 import openpi.training.weight_loaders as weight_loaders
 import openpi.transforms as _transforms
+from typing_extensions import override
+import tyro
 
 # RoboDojo normalization assets bundled with this adapter (openpi/assets/RoboDojo_assets).
 _DEFAULT_ROBODOJO_ASSETS_DIR = pathlib.Path(__file__).resolve().parents[3] / "assets" / "RoboDojo_assets"
@@ -39,6 +35,12 @@ _ROBODOJO_ASSETS_DIR = pathlib.Path(
 
 def _robodojo_repo_id(default: str = "RoboDojo_sim_arx-x5_v30") -> str:
     return os.environ.get("OPENPI_DATA_REPO_ID", default)
+
+
+def _yam_repo_id(default: str = "rhospolicy/yam-entong-fanya-box-1") -> str:
+    """Resolve the YAM LeRobot dataset while keeping the checked-in config deployable."""
+    return os.environ.get("OPENPI_YAM_DATA_REPO_ID", os.environ.get("OPENPI_DATA_REPO_ID", default))
+
 
 ModelType: TypeAlias = _model.ModelType
 # Work around a tyro issue with using nnx.filterlib.Filter directly.
@@ -577,6 +579,42 @@ class TrainConfig:
 
 # Use `get_config` if you need to get a config by name in your code.
 _CONFIGS = [
+    # YAM bimanual full fine-tuning from the released pi0.5 base checkpoint.
+    # The dataset stores absolute joint targets. LeRobotAlohaDataConfig converts the
+    # 12 arm joints to deltas and keeps the two normalized grippers absolute.
+    TrainConfig(
+        name="pi05_yam_green_block_circle",
+        model=pi0_config.Pi0Config(pi05=True),
+        data=LeRobotAlohaDataConfig(
+            repo_id=_yam_repo_id(),
+            default_prompt="Place the green block inside the circle.",
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(
+                inputs=[
+                    _transforms.RepackTransform(
+                        {
+                            "images": {
+                                "cam_high": "observation.images.cam_high",
+                                "cam_left_wrist": "observation.images.cam_left_wrist",
+                                "cam_right_wrist": "observation.images.cam_right_wrist",
+                            },
+                            "state": "observation.state",
+                            "actions": "action",
+                            "prompt": "prompt",
+                        }
+                    )
+                ]
+            ),
+            base_config=DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            os.environ.get("OPENPI_PI05_BASE_PARAMS", "gs://openpi-assets/checkpoints/pi05_base/params")
+        ),
+        assets_base_dir=os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", "./assets"),
+        checkpoint_base_dir=os.environ.get("OPENPI_YAM_CHECKPOINT_BASE_DIR", "./checkpoints"),
+        batch_size=64,
+        num_train_steps=20_000,
+    ),
     TrainConfig(
         name="pi0_base_aloha_full_sim_arx-x5_seed_0",
         model=pi0_config.Pi0Config(),

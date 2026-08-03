@@ -33,11 +33,10 @@ Copy the dataset so its directory matches the LeRobot repository ID:
 ```
 
 Install the pinned OpenPI environment. This command bypasses configured proxies and
-uses the Aliyun Python mirror for Torch/CUDA and other Python wheels, as required by
-the project deployment policy:
+uses the Aliyun Python mirror for Torch/CUDA and other Python wheels:
 
 ```bash
-cd XPolicyLab/policy/Pi_0/openpi
+cd XPolicyLab/policy/Pi_05/openpi
 env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
     -u http_proxy -u https_proxy -u all_proxy \
     NO_PROXY='*' no_proxy='*' \
@@ -45,23 +44,38 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
     uv --no-progress sync --frozen --group lerobot
 ```
 
+### Reuse an existing Pi_0 environment
+
+At the pinned XPolicyLab revision, `Pi_0/openpi` and `Pi_05/openpi` have identical
+`pyproject.toml` and `uv.lock` files. If `Pi_0/openpi/.venv` is already installed,
+verify that this is still true and then create a relative symlink:
+
+```bash
+cd /path/to/RhOSPolicy/XPolicyLab
+cmp policy/Pi_0/openpi/pyproject.toml policy/Pi_05/openpi/pyproject.toml
+cmp policy/Pi_0/openpi/uv.lock policy/Pi_05/openpi/uv.lock
+test ! -e policy/Pi_05/openpi/.venv
+ln -s ../../Pi_0/openpi/.venv policy/Pi_05/openpi/.venv
+```
+
+No reinstall is needed when both comparisons pass. If either comparison fails after
+a future XPolicyLab update, remove the symlink and run the pinned `uv sync` command
+inside `Pi_05/openpi` instead.
+
 The released pi0.5 checkpoint is hosted on Google Cloud Storage, so the server still
-needs direct access to `gs://openpi-assets` when normalization or training first
-loads the base weights/tokenizer.
+needs direct access to `gs://openpi-assets` when it first loads model/tokenizer
+assets.
 
 ## Normalize, then train
 
-Use absolute paths for generated assets and checkpoints if they should live outside
-the Git checkout:
-
 ```bash
 export HF_LEROBOT_HOME=/data/lerobot
-export OPENPI_YAM_DATA_REPO_ID=rhospolicy/yam-entong-fanya-box-1
+export OPENPI_LEROBOT_REPO_ID=rhospolicy/yam-entong-fanya-box-1
 export OPENPI_DATA_HOME=/data/openpi-cache
 export OPENPI_YAM_ASSETS_BASE_DIR=/data/rhospolicy-pi05/assets
 export OPENPI_YAM_CHECKPOINT_BASE_DIR=/data/rhospolicy-pi05/checkpoints
 
-cd /path/to/RhOSPolicy/XPolicyLab/policy/Pi_0/openpi
+cd /path/to/RhOSPolicy/XPolicyLab/policy/Pi_05/openpi
 uv run scripts/compute_norm_stats.py \
   --config-name pi05_yam_green_block_circle
 
@@ -73,14 +87,13 @@ uv run scripts/train.py pi05_yam_green_block_circle \
 
 With the environment above, normalization statistics are written under
 `/data/rhospolicy-pi05/assets/pi05_yam_green_block_circle/rhospolicy/yam-entong-fanya-box-1/`
-and are automatically loaded by the subsequent training command. If the path
-overrides are omitted, local `assets/` and `checkpoints/` directories are used; both
-are ignored by this repository.
+and are automatically loaded by training. The default is a global batch size of 64,
+20,000 steps, one FSDP device, checkpoints every 1,000 steps, and retention every
+5,000 steps.
 
-The default is a global batch size of 64, 20,000 steps, one FSDP device, checkpoints
-every 1,000 steps, and retention every 5,000 steps. Full fine-tuning generally needs
-more than 70 GB of accelerator memory. On a two-GPU server, enable model sharding and
-keep the global batch divisible by the number of devices:
+Full fine-tuning generally needs more than 70 GB of accelerator memory. On a
+two-GPU server, enable model sharding and keep the global batch divisible by the
+number of devices:
 
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 \

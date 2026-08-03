@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import dataclasses
 import difflib
 import logging
+import os
 import pathlib
 from typing import Any, Literal, Protocol, TypeAlias
 
@@ -34,6 +35,15 @@ import openpi.transforms as _transforms
 _ROBODOJO_ASSETS_DIR = pathlib.Path(__file__).resolve().parents[3] / "assets" / "RoboDojo_assets"
 # Norm stats for Tianji Marvin + Wuji Hand (written by compute_norm_stats).
 _WUJI_ASSETS_DIR = pathlib.Path(__file__).resolve().parents[3] / "assets" / "Wuji_assets"
+
+
+def _yam_repo_id(default: str = "rhospolicy/yam-entong-fanya-box-1") -> str:
+    """Resolve the YAM LeRobot dataset using the Pi_05 adapter conventions."""
+    return os.environ.get(
+        "OPENPI_LEROBOT_REPO_ID",
+        os.environ.get("OPENPI_YAM_DATA_REPO_ID", os.environ.get("OPENPI_DATA_REPO_ID", default)),
+    )
+
 
 ModelType: TypeAlias = _model.ModelType
 # Work around a tyro issue with using nnx.filterlib.Filter directly.
@@ -632,6 +642,42 @@ class TrainConfig:
 
 # Use `get_config` if you need to get a config by name in your code.
 _CONFIGS = [
+    # YAM bimanual full fine-tuning from the released pi0.5 base checkpoint.
+    # The dataset stores absolute joint targets. LeRobotAlohaDataConfig converts the
+    # 12 arm joints to deltas and keeps the two normalized grippers absolute.
+    TrainConfig(
+        name="pi05_yam_green_block_circle",
+        model=pi0_config.Pi0Config(pi05=True),
+        data=LeRobotAlohaDataConfig(
+            repo_id=_yam_repo_id(),
+            default_prompt="Place the green block inside the circle.",
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(
+                inputs=[
+                    _transforms.RepackTransform(
+                        {
+                            "images": {
+                                "cam_high": "observation.images.cam_high",
+                                "cam_left_wrist": "observation.images.cam_left_wrist",
+                                "cam_right_wrist": "observation.images.cam_right_wrist",
+                            },
+                            "state": "observation.state",
+                            "actions": "action",
+                            "prompt": "prompt",
+                        }
+                    )
+                ]
+            ),
+            base_config=DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            os.environ.get("OPENPI_PI05_BASE_PARAMS", "gs://openpi-assets/checkpoints/pi05_base/params")
+        ),
+        assets_base_dir=os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", "./assets"),
+        checkpoint_base_dir=os.environ.get("OPENPI_YAM_CHECKPOINT_BASE_DIR", "./checkpoints"),
+        batch_size=64,
+        num_train_steps=20_000,
+    ),
     TrainConfig(
         name="pi05_base_aloha_full_sim_arx-x5_seed_0",
         model=pi0_config.Pi0Config(pi05=True),
@@ -756,9 +802,7 @@ _CONFIGS = [
             # If your dataset uses cam_high instead of stereo_right, set:
             # base_image_key="observation.images.cam_high",
         ),
-        weight_loader=weight_loaders.PartialCheckpointWeightLoader(
-            "gs://openpi-assets/checkpoints/pi05_base/params"
-        ),
+        weight_loader=weight_loaders.PartialCheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
         num_train_steps=30_000,
         batch_size=64,
         lr_schedule=_optimizer.CosineDecaySchedule(

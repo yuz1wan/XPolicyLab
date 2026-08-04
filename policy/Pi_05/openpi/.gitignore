@@ -130,6 +130,8 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv-h200-jax
+.python-h200-jax
 env/
 venv/
 ENV/

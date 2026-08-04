@@ -41,6 +41,11 @@ bash train.sh <bench_name> <ckpt_name> <env_cfg_type> <action_type> <seed> <gpu_
 bash train.sh RoboDojo cotrain arx_x5 joint 0 0
 ```
 
+For YAM full fine-tuning on an H200, use the isolated JAX 0.6.2 environment and
+direct launcher documented in
+[`openpi/docs/h200_pi05_environment.md`](openpi/docs/h200_pi05_environment.md).
+Never run `uv sync` or `uv run` against `.venv-h200-jax`.
+
 Checkpoints land in `checkpoints/<bench_name>-<ckpt_name>-<env_cfg_type>-<action_type>-<seed>/`; at eval time `ckpt_name` may be the short run name (auto-combined into that directory name), the full run-directory name, or a path to a checkpoint directory. By default training reads the LeRobot repo produced by `process_data.sh` (`<bench_name>-<ckpt_name>-<env_cfg_type>-<action_type>`); override with `OPENPI_LEROBOT_REPO_ID` when reusing an existing dataset. `train.sh` sets `fsdp_devices=1` for one visible GPU and `2` for multi-GPU by default (override with `OPENPI_FSDP_DEVICES`).
 
 ## Evaluation

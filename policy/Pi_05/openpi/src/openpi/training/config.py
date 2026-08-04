@@ -676,7 +676,10 @@ _CONFIGS = [
         assets_base_dir=os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", "./assets"),
         checkpoint_base_dir=os.environ.get("OPENPI_YAM_CHECKPOINT_BASE_DIR", "./checkpoints"),
         batch_size=64,
-        num_train_steps=20_000,
+        num_train_steps=30_000,
+        save_interval=5_000,
+        keep_period=10_000,
+        fsdp_devices=1,
     ),
     TrainConfig(
         name="pi05_base_aloha_full_sim_arx-x5_seed_0",

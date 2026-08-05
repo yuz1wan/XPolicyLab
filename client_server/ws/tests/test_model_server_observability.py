@@ -14,10 +14,10 @@ def test_action_steps_reports_common_policy_reply_shapes():
 
 def test_infer_logs_start_completion_latency_and_horizon(caplog):
     class Model:
-        def update_obs(self, observation):
+        async def update_obs(self, observation):
             self.observation = observation
 
-        def get_action(self):
+        async def get_action(self):
             return [{"action": 1}, {"action": 2}]
 
     frame = Frame(

@@ -19,6 +19,8 @@ from client_server.ws.protocol.messages import MessageType
 from client_server.ws.protocol.schemas import Frame
 from websockets.asyncio.server import Server, ServerConnection, serve
 
+from XPolicyLab.utils.process_data import decode_obs_images
+
 logger = logging.getLogger(__name__)
 
 
@@ -256,6 +258,11 @@ class PolicyServer:
         observation = frame.payload.get("observation")
         if observation is None:
             raise WsError(ErrorCode.INVALID_FRAME, "infer payload missing observation")
+
+        try:
+            observation = decode_obs_images(observation)
+        except ValueError as exc:
+            raise WsError(ErrorCode.INVALID_FRAME, str(exc)) from exc
 
         request = str(frame.request_id)
         logger.info(

@@ -1,12 +1,15 @@
-import asyncio
-import os
-import threading
-import ast
-import time
-import yaml
-import importlib
 import argparse
+import ast
+import asyncio
+import importlib
+import logging
+import os
+import sys
+import threading
+import time
 import traceback
+
+import yaml
 from client_server.tcp.model_server import ModelServer
 
 
@@ -21,15 +24,26 @@ def eval_function_decorator(policy_model_name, Func_and_Class_name):
 
 def main(deploy_cfg):
     """Main entry: load model, start server, run indefinitely"""
+    logging.basicConfig(
+        level=getattr(logging, os.environ.get("XPOLICYLAB_LOG_LEVEL", "INFO").upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
+    )
     # Extract basic arguments
     policy_name = deploy_cfg.get("policy_name")
     port = deploy_cfg.get("port")
     host = deploy_cfg.get("host", "0.0.0.0")
     protocol = deploy_cfg.get("protocol", "ws")
 
+    print(
+        f"[SERVER] loading policy={policy_name} protocol={protocol} endpoint={host}:{port}",
+        flush=True,
+    )
+
     # Instantiate model
     model_class_func = eval_function_decorator(f"XPolicyLab.policy.{policy_name}.model", "Model")
     model = model_class_func(deploy_cfg)
+    print(f"[SERVER] policy={policy_name} ready", flush=True)
 
     if protocol == "ws":
         try:
@@ -38,7 +52,6 @@ def main(deploy_cfg):
             if exc.name == "client_server":
                 # client_server.ws ships in this repo; make it importable even when
                 # XPolicyLab is not pip-installed in the current environment.
-                import sys
                 repo_root = os.path.dirname(os.path.abspath(__file__))
                 if repo_root not in sys.path:
                     sys.path.insert(0, repo_root)

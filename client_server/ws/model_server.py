@@ -13,12 +13,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
-from websockets.asyncio.server import Server, ServerConnection, serve
-
 from client_server.ws.protocol.codec import decode_envelope, encode_frame
 from client_server.ws.protocol.exceptions import ErrorCode, WsError
 from client_server.ws.protocol.messages import MessageType
 from client_server.ws.protocol.schemas import Frame
+from websockets.asyncio.server import Server, ServerConnection, serve
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +42,17 @@ def _normalize_ws_ping(value: Any, *, field_name: str) -> float | None:
             f"{field_name} must be null or a positive number, got {value!r}"
         )
     return seconds
+
+
+def _action_steps(result: Any) -> int | None:
+    """Best-effort action horizon for concise server-side observability."""
+    value = result.get("actions") if isinstance(result, Mapping) and "actions" in result else result
+    if isinstance(value, (list, tuple)):
+        return len(value)
+    shape = getattr(value, "shape", None)
+    if shape is not None and len(shape) >= 1:
+        return int(shape[0])
+    return None
 
 
 @dataclass
@@ -247,6 +257,13 @@ class PolicyServer:
         if observation is None:
             raise WsError(ErrorCode.INVALID_FRAME, "infer payload missing observation")
 
+        request = str(frame.request_id)
+        logger.info(
+            "[INFER] start request=%s trial=%s step=%s",
+            request,
+            frame.trial_id or "-",
+            frame.step if frame.step is not None else "-",
+        )
         start = time.perf_counter()
         try:
             async with self._model_lock:
@@ -285,9 +302,17 @@ class PolicyServer:
                         )
                     result = await self._invoke_method(infer, observation)
         except Exception as exc:
+            logger.exception("[INFER] failed request=%s", request)
             raise WsError(ErrorCode.INFER_FAILED, str(exc)) from exc
 
         latency_ms = (time.perf_counter() - start) * 1000.0
+        action_steps = _action_steps(result)
+        logger.info(
+            "[INFER] done request=%s latency_ms=%.1f action_steps=%s",
+            request,
+            latency_ms,
+            action_steps if action_steps is not None else "unknown",
+        )
         if isinstance(result, Mapping) and "actions" in result:
             payload: dict[str, Any] = dict(result)
             payload.setdefault("latency_ms", latency_ms)

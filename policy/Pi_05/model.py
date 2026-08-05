@@ -3,14 +3,11 @@
 """
 #!/usr/bin/python3
 """
+import logging
 from pathlib import Path
-import os
-import sys
 from typing import Any
 
-import cv2
 import numpy as np
-
 from openpi.policies import policy_config as _policy_config
 from openpi.shared import normalize as _normalize
 from openpi.training import config as _config
@@ -24,9 +21,9 @@ from XPolicyLab.utils.process_data import (
     unpack_robot_state,
 )
 
-
 _POLICY_DIR = Path(__file__).resolve().parent
 _CHECKPOINTS_DIR = _POLICY_DIR / "checkpoints"
+logger = logging.getLogger(__name__)
 
 
 def _extract_step_number(value: Any) -> int | None:
@@ -109,7 +106,9 @@ class Model(ModelTemplate):
         config = _config.get_config(train_config_name)
         norm_stats = None
         if repo_id is not None:
-            norm_stats = _normalize.load(model_root / "assets" / str(repo_id))
+            norm_stats_path = model_root / "assets" / str(repo_id)
+            norm_stats = _normalize.load(norm_stats_path)
+            logger.info("Loaded deployment norm stats from %s", norm_stats_path)
 
         return _policy_config.create_trained_policy(config, str(model_root), norm_stats=norm_stats)
 

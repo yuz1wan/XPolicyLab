@@ -1,0 +1,4 @@
+[submodule "policy/Xiaomi_Robotics_1/post_training"]
+	path = policy/Xiaomi_Robotics_1/post_training
+	url = git@github.com:XiaomiRobotics/Xiaomi-Robotics-1.git
+	branch = main

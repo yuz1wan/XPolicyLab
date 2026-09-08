@@ -1,8 +1,13 @@
 # Xiaomi_Robotics_1
 
-**Contributor:** Xiaomi Corporation | **Paper:** Not released | **arXiv:** Not released | **Original code:** See vendored `xiaomi_robotics_1/`.
+**Contributor:** Xiaomi Corporation | **Paper:** Not released | **arXiv:** Not released | **Original code:** [`XiaomiRobotics/Xiaomi-Robotics-1`](https://github.com/XiaomiRobotics/Xiaomi-Robotics-1).
 
-`Xiaomi_Robotics_1` is the inference-only adapter for Xiaomi's MiBot model: it serves a pre-trained checkpoint through a Qwen3-VL-4B-Instruct processor with action tokens and converts the model's relative (delta) action chunks into absolute RoboDojo joint or end-effector actions. Integration scripts live at this directory level; the vendored upstream implementation lives in `xiaomi_robotics_1/`.
+`Xiaomi_Robotics_1` contains two deliberately separate integrations. The existing
+`xiaomi_robotics_1/` tree remains the XPolicyLab inference adapter used by RoboDojo.
+The official Xiaomi repository is tracked as the nested `post_training/` submodule
+and supplies the XR-1 post-training implementation under `post_training/xr1/`.
+Keeping that boundary avoids copying upstream training code and makes upstream
+updates an explicit submodule-pointer change.
 
 Shared conventions — argument meanings, checkpoint naming, split-machine deployment, `EVAL_ENV_TYPE` — are documented in the [XPolicyLab README](../../README.md). Official results: [RoboDojo LeaderBoard](https://robodojo-benchmark.com/LeaderBoard).
 
@@ -18,7 +23,10 @@ The installer creates the `mibot` conda environment with PyTorch 2.8, Flash Atte
 
 ## Data Processing
 
-`process_data.sh` is a stub: no data processing is needed — this policy uses pre-trained checkpoints directly.
+The official trainer consumes one metadata JSON and three synchronized videos per
+episode. Run `process_data.sh` to locate the pinned upstream format document.
+Embodiment-specific conversion is intentionally owned by the robot integration
+repository; for YAM, use RhOSPolicy's `yam_xiaomi_robotics_1 prepare` workflow.
 
 ## Model Assets
 
@@ -39,7 +47,22 @@ At evaluation time the checkpoint is resolved from the `model_dir` field in `dep
 
 ## Training
 
-`train.sh` is a stub: training is managed externally and only inference code is available at this time — the training code will be open-sourced in the future. Place the downloaded official checkpoint under `checkpoints/` as described in Model Assets and pass its folder name as `ckpt_name` during evaluation.
+Initialize nested submodules, prepare an official-format dataset and launch the
+pinned official trainer through the stable XPolicyLab wrapper:
+
+```bash
+git submodule update --init --recursive
+RESOURCE_GPU=1 bash train.sh \
+  --config-dir /absolute/path/to/generated/configs \
+  data=yam \
+  model.params.pretrained=/absolute/path/to/model_states.pt \
+  trainer.project=xiaomi-robotics-1 \
+  trainer.exp_name=yam-posttrain
+```
+
+`train.sh` changes into `post_training/xr1/` before invoking the official script,
+so it is safe to call from any working directory. Extra arguments are passed to
+Hydra unchanged.
 
 ## Evaluation
 

@@ -3,14 +3,11 @@
 """
 #!/usr/bin/python3
 """
+import logging
 from pathlib import Path
-import os
-import sys
 from typing import Any
 
-import cv2
 import numpy as np
-
 from openpi.policies import policy_config as _policy_config
 from openpi.shared import normalize as _normalize
 from openpi.training import config as _config
@@ -18,15 +15,14 @@ from openpi.training import config as _config
 from XPolicyLab.model_template import ModelTemplate
 from XPolicyLab.utils.checkpoint_resolver import candidate_checkpoint_roots
 from XPolicyLab.utils.process_data import (
-    decode_image_bit,
     get_robot_action_dim_info,
     pack_robot_state,
     unpack_robot_state,
 )
 
-
 _POLICY_DIR = Path(__file__).resolve().parent
 _CHECKPOINTS_DIR = _POLICY_DIR / "checkpoints"
+logger = logging.getLogger(__name__)
 
 
 def _extract_step_number(value: Any) -> int | None:
@@ -109,7 +105,9 @@ class Model(ModelTemplate):
         config = _config.get_config(train_config_name)
         norm_stats = None
         if repo_id is not None:
-            norm_stats = _normalize.load(model_root / "assets" / str(repo_id))
+            norm_stats_path = model_root / "assets" / str(repo_id)
+            norm_stats = _normalize.load(norm_stats_path)
+            logger.info("Loaded deployment norm stats from %s", norm_stats_path)
 
         return _policy_config.create_trained_policy(config, str(model_root), norm_stats=norm_stats)
 
@@ -228,13 +226,7 @@ def extract_image(observation, candidate_names):
 
 
 def ensure_chw_uint8(image):
-    if isinstance(image, (bytes, bytearray, memoryview)):
-        image = decode_compressed_image(np.frombuffer(bytes(image), dtype=np.uint8))
-
     image = np.asarray(image)
-
-    if image.ndim == 1 and image.dtype == np.uint8:
-        image = decode_compressed_image(image)
 
     if image.ndim != 3:
         raise ValueError(f"Expected image ndim=3, got shape {image.shape}")
@@ -253,7 +245,3 @@ def ensure_chw_uint8(image):
         raise ValueError(f"Unsupported image shape: {image.shape}")
 
     return np.transpose(image_hwc, (2, 0, 1))
-
-
-def decode_compressed_image(image_buffer):
-    return decode_image_bit(image_buffer)

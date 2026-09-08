@@ -17,6 +17,7 @@ class WsModelClient:
         trial_id: str,
         action_case_id: str | None = None,
         repeat_index: int | None = None,
+        request_timeout_s: float = 120.0,
         ws_ping_interval_s: float | None = 20.0,
         ws_ping_timeout_s: float | None = 20.0,
         client: Any | None = None,
@@ -32,6 +33,7 @@ class WsModelClient:
             PolicyEvalClientConfig(
                 url=url,
                 evaluation_id=evaluation_id,
+                request_timeout_s=request_timeout_s,
                 ws_ping_interval_s=ws_ping_interval_s,
                 ws_ping_timeout_s=ws_ping_timeout_s,
             )

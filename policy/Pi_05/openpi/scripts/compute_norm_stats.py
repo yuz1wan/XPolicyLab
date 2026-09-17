@@ -5,18 +5,22 @@ will compute the mean and standard deviation of the data in the dataset and save
 to the config assets directory.
 """
 
+# Heavy imports are deliberately deferred so scalar statistics need no model stack.
+# ruff: noqa: PLC0415
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 import tqdm
-import tyro
 
-import openpi.models.model as _model
-import openpi.shared.normalize as normalize
-import openpi.training.config as _config
-import openpi.training.data_loader as _data_loader
-import openpi.transforms as transforms
+if TYPE_CHECKING:
+    import openpi.models.model as _model
+    import openpi.training.config as _config
+    import openpi.training.data_loader as _data_loader
 
 
-class RemoveStrings(transforms.DataTransformFn):
+class RemoveStrings:
     def __call__(self, x: dict) -> dict:
         return {k: v for k, v in x.items() if not np.issubdtype(np.asarray(v).dtype, np.str_)}
 
@@ -29,6 +33,8 @@ def create_torch_dataloader(
     num_workers: int,
     max_frames: int | None = None,
 ) -> tuple[_data_loader.Dataset, int]:
+    import openpi.training.data_loader as _data_loader
+
     if data_config.repo_id is None:
         raise ValueError("Data config must have a repo_id")
     dataset = _data_loader.create_torch_dataset(data_config, action_horizon, model_config)
@@ -63,6 +69,8 @@ def create_rlds_dataloader(
     batch_size: int,
     max_frames: int | None = None,
 ) -> tuple[_data_loader.Dataset, int]:
+    import openpi.training.data_loader as _data_loader
+
     dataset = _data_loader.create_rlds_dataset(data_config, action_horizon, batch_size, shuffle=False)
     dataset = _data_loader.IterableTransformedDataset(
         dataset,
@@ -86,7 +94,19 @@ def create_rlds_dataloader(
     return data_loader, num_batches
 
 
-def main(config_name: str, max_frames: int | None = None):
+def main(config_name: str, max_frames: int | None = None, *, fast: bool = True):
+    # Dispatch before importing JAX/models/tokenizers or touching any video.
+    from openpi.training.yam_tasks import TASKS
+
+    if fast and config_name in TASKS and max_frames is None:
+        from openpi.training.fast_yam_norm import run
+
+        run(config_name)
+        return
+
+    import openpi.shared.normalize as normalize
+    import openpi.training.config as _config
+
     config = _config.get_config(config_name)
     data_config = config.data.create(config.assets_dirs, config.model)
 
@@ -114,4 +134,6 @@ def main(config_name: str, max_frames: int | None = None):
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(main)

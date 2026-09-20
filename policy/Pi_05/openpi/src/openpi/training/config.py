@@ -22,6 +22,7 @@ import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.droid_policy as droid_policy
 import openpi.policies.libero_policy as libero_policy
 import openpi.policies.wuji_policy as wuji_policy
+import openpi.policies.yam_eef_policy as yam_eef_policy
 import openpi.shared.download as _download
 import openpi.shared.normalize as _normalize
 import openpi.training.droid_rlds_dataset as droid_rlds_dataset
@@ -295,6 +296,22 @@ class LeRobotAlohaDataConfig(DataConfigFactory):
             data_transforms=data_transforms,
             model_transforms=model_transforms,
             action_sequence_keys=self.action_sequence_keys,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class LeRobotYamEEFDataConfig(LeRobotAlohaDataConfig):
+    @override
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
+        return dataclasses.replace(
+            self.create_base_config(assets_dirs, model_config),
+            repack_transforms=self.repack_transforms,
+            data_transforms=_transforms.Group(
+                inputs=[yam_eef_policy.YamEEFInputs()],
+                outputs=[yam_eef_policy.YamEEFOutputs()],
+            ),
+            model_transforms=ModelTransformFactory(default_prompt=self.default_prompt)(model_config),
+            action_sequence_keys=("action.eef_pose",),
         )
 
 
@@ -643,13 +660,14 @@ class TrainConfig:
 
 def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
     """Shared MCAP YAM recipe; task contracts also drive conversion and normalization."""
+    data_factory = LeRobotYamEEFDataConfig if task.action_space == "eef" else LeRobotAlohaDataConfig
     return TrainConfig(
         name=task.name,
         model=pi0_config.Pi0Config(pi05=True, action_horizon=task.action_horizon),
-        data=LeRobotAlohaDataConfig(
+        data=data_factory(
             repo_id=task.resolved_repo_id(),
             default_prompt=task.prompt,
-            use_delta_joint_actions=True,
+            use_delta_joint_actions=task.action_space == "joints",
             adapt_to_pi=False,
             repack_transforms=_transforms.Group(
                 inputs=[
@@ -660,8 +678,9 @@ def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
                                 "cam_left_wrist": "observation.images.cam_left_wrist",
                                 "cam_right_wrist": "observation.images.cam_right_wrist",
                             },
-                            "state": "observation.state",
-                            "actions": "action",
+                            "state": task.state_key,
+                            "actions": "action.eef_pose" if task.action_space == "eef" else "action",
+                            **({"eef_state": "observation.eef_pose"} if task.action_space == "eef" else {}),
                             "prompt": "prompt",
                         }
                     )
@@ -687,7 +706,7 @@ _CONFIGS = [
     # YAM bimanual full fine-tuning from the released pi0.5 base checkpoint.
     # The dataset stores absolute joint targets. LeRobotAlohaDataConfig converts the
     # 12 arm joints to deltas and keeps the two normalized grippers absolute.
-    *(_yam_train_config(task) for task in yam_tasks.TASKS.values()),
+    *(_yam_train_config(task) for task in yam_tasks.ALL_TASKS.values()),
     TrainConfig(
         name="pi05_yam_green_block_circle",
         model=pi0_config.Pi0Config(pi05=True),

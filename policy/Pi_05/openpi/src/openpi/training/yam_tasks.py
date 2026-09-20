@@ -1,6 +1,6 @@
 """Shared, dependency-free YAM task contracts for training and fast statistics."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 
@@ -10,6 +10,8 @@ class YamTask:
     name: str
     repo_id: str
     prompt: str
+    action_space: str = "joints"
+    state_space: str = "joints"
     num_train_steps: int = 50_000
     outcome: str = "success"
     action_horizon: int = 50
@@ -20,7 +22,7 @@ class YamTask:
 
     @property
     def task_id(self) -> int:
-        return int(self.name.rsplit("_", 1)[1])
+        return int(self.name.split("_task_", 1)[1].split("_", 1)[0])
 
     def resolved_repo_id(self) -> str:
         return os.environ.get(
@@ -48,3 +50,15 @@ TASK_YAM_0010 = YamTask(
     prompt="One gripper holds the chewing gum bottle, while the other one removes the lid.",
 )
 TASKS = {task.name: task for task in (TASK_YAM_0004, TASK_YAM_0006, TASK_YAM_0010)}
+
+# EEF variants deliberately have separate dataset/config/asset identities.
+TASK_YAM_0004_EEF = replace(
+    TASK_YAM_0004, name="pi05_yam_task_0004_eef",
+    repo_id="rhospolicy/task-yam-0004-eef", action_space="eef",
+)
+TASK_YAM_0004_EEF_STATE = replace(
+    TASK_YAM_0004_EEF, name="pi05_yam_task_0004_eef_state",
+    state_space="eef", state_key="observation.eef_pose",
+)
+EEF_TASKS = {task.name: task for task in (TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE)}
+ALL_TASKS = {**TASKS, **EEF_TASKS}

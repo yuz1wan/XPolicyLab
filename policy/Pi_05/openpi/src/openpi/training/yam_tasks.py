@@ -60,5 +60,9 @@ TASK_YAM_0004_EEF_STATE = replace(
     TASK_YAM_0004_EEF, name="pi05_yam_task_0004_eef_state",
     state_space="eef", state_key="observation.eef_pose",
 )
-EEF_TASKS = {task.name: task for task in (TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE)}
+TASK_YAM_0010_EEF = replace(
+    TASK_YAM_0010, name="pi05_yam_task_0010_eef",
+    repo_id="rhospolicy/task-yam-0010-eef", action_space="eef",
+)
+EEF_TASKS = {task.name: task for task in (TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE, TASK_YAM_0010_EEF)}
 ALL_TASKS = {**TASKS, **EEF_TASKS}

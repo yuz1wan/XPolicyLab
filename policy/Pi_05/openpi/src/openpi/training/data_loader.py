@@ -68,6 +68,29 @@ class TransformedDataset(Dataset[T_co]):
         return len(self._dataset)
 
 
+class ActionChunkSidecarDataset(Dataset[dict]):
+    """Attach one precomputed high-rate EEF chunk to each low-rate observation."""
+
+    def __init__(self, dataset: Dataset, path: os.PathLike[str], horizon: int):
+        self._dataset = dataset
+        self._path = os.fspath(path)
+        chunks = np.load(self._path, mmap_mode="r")
+        if chunks.shape != (len(dataset), horizon, 16) or chunks.dtype != np.float32:
+            raise ValueError(f"Invalid action chunk sidecar: {self._path}: {chunks.shape}")
+        # Each spawned loader worker opens its own mmap instead of serializing the array.
+        self._chunks = None
+
+    def __getitem__(self, index: SupportsIndex) -> dict:
+        if self._chunks is None:
+            self._chunks = np.load(self._path, mmap_mode="r")
+        row = dict(self._dataset[index])
+        row["action.eef_pose"] = torch.from_numpy(np.array(self._chunks[index], copy=True))
+        return row
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+
 class IterableTransformedDataset(IterableDataset[T_co]):
     def __init__(
         self,
@@ -151,6 +174,11 @@ def create_torch_dataset(
         },
         video_backend=data_config.video_backend,
     )
+
+    if data_config.action_chunk_sidecar:
+        dataset = ActionChunkSidecarDataset(
+            dataset, dataset.root / data_config.action_chunk_sidecar, action_horizon
+        )
 
     if data_config.prompt_from_task:
         dataset = TransformedDataset(dataset, [_transforms.PromptFromLeRobotTask(dataset_meta.tasks)])

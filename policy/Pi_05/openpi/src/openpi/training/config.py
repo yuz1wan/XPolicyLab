@@ -107,6 +107,8 @@ class DataConfig:
     # sequence is defined by the `action_horizon` field in the model config. This should be adjusted if your
     # LeRobot dataset is using different keys to represent the action.
     action_sequence_keys: Sequence[str] = ("actions",)
+    # Optional per-anchor action chunks stored alongside a 30 Hz LeRobot dataset.
+    action_chunk_sidecar: str | None = None
 
     # If true, will use the LeRobot dataset task to define the prompt.
     prompt_from_task: bool = False
@@ -301,6 +303,8 @@ class LeRobotAlohaDataConfig(DataConfigFactory):
 
 @dataclasses.dataclass(frozen=True)
 class LeRobotYamEEFDataConfig(LeRobotAlohaDataConfig):
+    action_chunk_sidecar: str | None = None
+
     @override
     def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
         return dataclasses.replace(
@@ -311,7 +315,8 @@ class LeRobotYamEEFDataConfig(LeRobotAlohaDataConfig):
                 outputs=[yam_eef_policy.YamEEFOutputs()],
             ),
             model_transforms=ModelTransformFactory(default_prompt=self.default_prompt)(model_config),
-            action_sequence_keys=("action.eef_pose",),
+            action_sequence_keys=() if self.action_chunk_sidecar else ("action.eef_pose",),
+            action_chunk_sidecar=self.action_chunk_sidecar,
         )
 
 
@@ -666,6 +671,7 @@ def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
         model=pi0_config.Pi0Config(pi05=True, action_horizon=task.action_horizon),
         data=data_factory(
             repo_id=task.resolved_repo_id(),
+            **({"action_chunk_sidecar": "action_60hz/chunks.npy"} if task.action_hz == 60 else {}),
             default_prompt=task.prompt,
             use_delta_joint_actions=task.action_space == "joints",
             adapt_to_pi=False,

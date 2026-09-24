@@ -15,6 +15,7 @@ class YamTask:
     num_train_steps: int = 50_000
     outcome: str = "success"
     action_horizon: int = 50
+    action_hz: int = 30
     batch_size: int = 64
     delta_mask: tuple[bool, ...] = (True,) * 6 + (False,) + (True,) * 6 + (False,)
     state_key: str = "observation.state"
@@ -64,5 +65,11 @@ TASK_YAM_0010_EEF = replace(
     TASK_YAM_0010, name="pi05_yam_task_0010_eef",
     repo_id="rhospolicy/task-yam-0010-eef", action_space="eef",
 )
-EEF_TASKS = {task.name: task for task in (TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE, TASK_YAM_0010_EEF)}
+TASK_YAM_0010_EEF_60HZ = replace(
+    TASK_YAM_0010_EEF, name="pi05_yam_task_0010_eef_60hz",
+    repo_id="rhospolicy/task-yam-0010-eef-60hz", action_hz=60,
+)
+EEF_TASKS = {task.name: task for task in (
+    TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE, TASK_YAM_0010_EEF, TASK_YAM_0010_EEF_60HZ,
+)}
 ALL_TASKS = {**TASKS, **EEF_TASKS}

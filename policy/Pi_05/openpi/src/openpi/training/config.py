@@ -304,6 +304,7 @@ class LeRobotAlohaDataConfig(DataConfigFactory):
 @dataclasses.dataclass(frozen=True)
 class LeRobotYamEEFDataConfig(LeRobotAlohaDataConfig):
     action_chunk_sidecar: str | None = None
+    state_rotation: str = "quaternion"
 
     @override
     def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
@@ -311,7 +312,7 @@ class LeRobotYamEEFDataConfig(LeRobotAlohaDataConfig):
             self.create_base_config(assets_dirs, model_config),
             repack_transforms=self.repack_transforms,
             data_transforms=_transforms.Group(
-                inputs=[yam_eef_policy.YamEEFInputs()],
+                inputs=[yam_eef_policy.YamEEFInputs(state_rotation=self.state_rotation)],
                 outputs=[yam_eef_policy.YamEEFOutputs()],
             ),
             model_transforms=ModelTransformFactory(default_prompt=self.default_prompt)(model_config),
@@ -672,6 +673,7 @@ def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
         data=data_factory(
             repo_id=task.resolved_repo_id(),
             **({"action_chunk_sidecar": "action_60hz/chunks.npy"} if task.action_hz == 60 else {}),
+            **({"state_rotation": task.state_rotation} if task.action_space == "eef" else {}),
             default_prompt=task.prompt,
             use_delta_joint_actions=task.action_space == "joints",
             adapt_to_pi=False,

@@ -12,6 +12,7 @@ class YamTask:
     prompt: str
     action_space: str = "joints"
     state_space: str = "joints"
+    state_rotation: str = "quaternion"
     num_train_steps: int = 50_000
     outcome: str = "success"
     action_horizon: int = 50
@@ -73,6 +74,10 @@ TASK_YAM_0004_EEF_STATE = replace(
     TASK_YAM_0004_EEF, name="pi05_yam_task_0004_eef_state",
     state_space="eef", state_key="observation.eef_pose",
 )
+TASK_YAM_0004_EEF_STATE_ROT6D = replace(
+    TASK_YAM_0004_EEF_STATE, name="pi05_yam_task_0004_eef_state_rot6d",
+    state_rotation="rot6d",
+)
 TASK_YAM_0006_EEF = replace(
     TASK_YAM_0006, name="pi05_yam_task_0006_eef",
     repo_id="rhospolicy/task-yam-0006-eef", action_space="eef",
@@ -98,7 +103,7 @@ TASK_YAM_0015_EEF = replace(
     repo_id="rhospolicy/task-yam-0015-eef", action_space="eef",
 )
 EEF_TASKS = {task.name: task for task in (
-    TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE,
+    TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE, TASK_YAM_0004_EEF_STATE_ROT6D,
     TASK_YAM_0006_EEF, TASK_YAM_0006_EEF_60HZ,
     TASK_YAM_0010_EEF, TASK_YAM_0010_EEF_60HZ,
     TASK_YAM_0008_EEF, TASK_YAM_0015_EEF,

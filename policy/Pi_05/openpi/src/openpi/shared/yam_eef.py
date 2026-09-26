@@ -11,6 +11,29 @@ import numpy as np
 EEF_ACTION_DIM = 7
 EEF_GRIPPER_INDEX = 6
 
+
+def bimanual_pose_to_rot6d_state(poses: np.ndarray) -> np.ndarray:
+    """Absolute arm-base poses to [left xyz, R[:,0], R[:,1], grip, right ...].
+
+    Input is 16D xyz/quaternion-xyzw/gripper; output is 20D. This changes
+    the state encoding only, never the reference frame or relative actions.
+    """
+    poses = np.asarray(poses, dtype=np.float32)
+    if poses.ndim < 1 or poses.shape[-1] != 16 or not np.isfinite(poses).all():
+        raise ValueError("EEF state must be finite with final dimension 16")
+    arms = []
+    for offset in (0, 8):
+        arm = poses[..., offset:offset + 8]
+        quat = arm[..., 3:7]
+        norm = np.linalg.norm(quat, axis=-1, keepdims=True)
+        if np.any(norm < 1e-8):
+            raise ValueError("EEF state contains a zero quaternion")
+        rotation = quaternion_to_rotation_matrix(quat / norm)
+        # Column-major concatenation, explicitly NOT interleaved row-major flattening.
+        rot6d = np.concatenate((rotation[..., :, 0], rotation[..., :, 1]), axis=-1)
+        arms.append(np.concatenate((arm[..., :3], rot6d, arm[..., 7:8]), axis=-1))
+    return np.concatenate(arms, axis=-1).astype(np.float32)
+
 def rotation_matrix_to_quaternion(rotation: np.ndarray) -> np.ndarray:
     """Convert one 3x3 rotation matrix to canonical xyzw quaternion form."""
 

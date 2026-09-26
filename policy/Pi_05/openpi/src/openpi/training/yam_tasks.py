@@ -50,7 +50,19 @@ TASK_YAM_0010 = YamTask(
     repo_id="rhospolicy/task-yam-0010",
     prompt="One gripper holds the chewing gum bottle, while the other one removes the lid.",
 )
-TASKS = {task.name: task for task in (TASK_YAM_0004, TASK_YAM_0006, TASK_YAM_0010)}
+TASK_YAM_0008 = YamTask(
+    name="pi05_yam_task_0008",
+    repo_id="rhospolicy/task-yam-0008",
+    prompt="One gripper clamps the bottle, and the other gripper rotates to open the cap.",
+)
+TASK_YAM_0015 = YamTask(
+    name="pi05_yam_task_0015",
+    repo_id="rhospolicy/task-yam-0015",
+    prompt="Put items in the drawer.",
+)
+TASKS = {task.name: task for task in (
+    TASK_YAM_0004, TASK_YAM_0006, TASK_YAM_0008, TASK_YAM_0010, TASK_YAM_0015,
+)}
 
 # EEF variants deliberately have separate dataset/config/asset identities.
 TASK_YAM_0004_EEF = replace(
@@ -77,9 +89,18 @@ TASK_YAM_0010_EEF_60HZ = replace(
     TASK_YAM_0010_EEF, name="pi05_yam_task_0010_eef_60hz",
     repo_id="rhospolicy/task-yam-0010-eef-60hz", action_hz=60,
 )
+TASK_YAM_0008_EEF = replace(
+    TASK_YAM_0008, name="pi05_yam_task_0008_eef",
+    repo_id="rhospolicy/task-yam-0008-eef", action_space="eef",
+)
+TASK_YAM_0015_EEF = replace(
+    TASK_YAM_0015, name="pi05_yam_task_0015_eef",
+    repo_id="rhospolicy/task-yam-0015-eef", action_space="eef",
+)
 EEF_TASKS = {task.name: task for task in (
     TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE,
     TASK_YAM_0006_EEF, TASK_YAM_0006_EEF_60HZ,
     TASK_YAM_0010_EEF, TASK_YAM_0010_EEF_60HZ,
+    TASK_YAM_0008_EEF, TASK_YAM_0015_EEF,
 )}
 ALL_TASKS = {**TASKS, **EEF_TASKS}

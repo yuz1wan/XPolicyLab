@@ -106,6 +106,10 @@ TASK_YAM_0008_EEF = replace(
     TASK_YAM_0008, name="pi05_yam_task_0008_eef",
     repo_id="rhospolicy/task-yam-0008-eef", action_space="eef",
 )
+TASK_YAM_0008_EEF_60HZ = replace(
+    TASK_YAM_0008_EEF, name="pi05_yam_task_0008_eef_60hz",
+    repo_id="rhospolicy/task-yam-0008-eef-60hz", action_hz=60,
+)
 TASK_YAM_0015_EEF = replace(
     TASK_YAM_0015, name="pi05_yam_task_0015_eef",
     repo_id="rhospolicy/task-yam-0015-eef", action_space="eef",
@@ -114,6 +118,6 @@ EEF_TASKS = {task.name: task for task in (
     TASK_YAM_0004_EEF, TASK_YAM_0004_EEF_STATE, TASK_YAM_0004_EEF_STATE_ROT6D,
     TASK_YAM_0006_EEF, TASK_YAM_0006_EEF_60HZ, TASK_YAM_0006_EEF_STATE_ROT6D,
     TASK_YAM_0010_EEF, TASK_YAM_0010_EEF_60HZ, TASK_YAM_0010_EEF_STATE_ROT6D,
-    TASK_YAM_0008_EEF, TASK_YAM_0015_EEF,
+    TASK_YAM_0008_EEF, TASK_YAM_0008_EEF_60HZ, TASK_YAM_0015_EEF,
 )}
 ALL_TASKS = {**TASKS, **EEF_TASKS}

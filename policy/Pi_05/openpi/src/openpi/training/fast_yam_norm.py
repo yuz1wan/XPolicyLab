@@ -81,7 +81,12 @@ def load_numeric(root: Path, task: YamTask):
             raise ValueError("Invalid episode boundaries")
         if not np.all(ep_col[lo:hi] == i) or not np.array_equal(frame_col[lo:hi], np.arange(hi - lo)):
             raise ValueError("Episode/frame index mismatch")
-        if not np.allclose(timestamps[lo:hi], np.arange(hi - lo) / info["fps"], atol=3e-6, rtol=0):
+        # LeRobot stores timestamps as float32. Beyond 64 s, rounding a valid
+        # frame/fps timestamp can exceed 3 us; compare with the stored grid.
+        expected_timestamps = (np.arange(hi - lo) / info["fps"]).astype(timestamps.dtype)
+        if not np.issubdtype(timestamps.dtype, np.floating) or not np.allclose(
+            timestamps[lo:hi], expected_timestamps, atol=3e-6, rtol=0
+        ):
             raise ValueError("Non-uniform timeline")
         ends[lo:hi] = hi - 1
         previous = hi

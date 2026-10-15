@@ -42,7 +42,25 @@ def main(deploy_cfg):
 
     # Instantiate model
     model_class_func = eval_function_decorator(f"XPolicyLab.policy.{policy_name}.model", "Model")
+    from client_server.server_identity import attach_model_identity, model_identity
+
+    # Resolve Pi05's selected checkpoint before loading, then pin that exact path.
+    # The metadata must describe the model actually loaded, not a UI-side YAML.
+    checkpoint, action_space, action_horizon = None, "unknown", None
+    if policy_name == "Pi_05":
+        module = importlib.import_module(model_class_func.__module__)
+        checkpoint = module._resolve_pi05_model_root(deploy_cfg).resolve()
+        deploy_cfg = dict(deploy_cfg, model_path=str(checkpoint))
+        train = module._config.get_config(deploy_cfg.get("train_config_name", "pi05_aloha"))
+        action_space = "eef" if isinstance(train.data, module._config.LeRobotYamEEFDataConfig) else "joints"
+        action_horizon = int(train.model.action_horizon)
+        deploy_cfg.setdefault("train_config_name", "pi05_aloha")
+        deploy_cfg.setdefault("repo_id", "1118")
     model = model_class_func(deploy_cfg)
+    attach_model_identity(model, model_identity(
+        deploy_cfg, checkpoint=checkpoint, action_space=action_space,
+        action_horizon=action_horizon,
+    ))
     print(f"[SERVER] policy={policy_name} ready", flush=True)
 
     if protocol == "ws":

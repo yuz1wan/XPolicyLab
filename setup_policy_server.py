@@ -44,17 +44,23 @@ def main(deploy_cfg):
     model_class_func = eval_function_decorator(f"XPolicyLab.policy.{policy_name}.model", "Model")
     from client_server.server_identity import attach_model_identity, model_identity
 
-    # Resolve Pi05's selected checkpoint before loading, then pin that exact path.
-    # The metadata must describe the model actually loaded, not a UI-side YAML.
+    # Pin the selected checkpoint and report the architecture actually loaded.
     checkpoint, action_space, action_horizon = None, "unknown", None
-    if policy_name == "Pi_05":
+    if policy_name in ("Pi_0", "Pi_05"):
         module = importlib.import_module(model_class_func.__module__)
-        checkpoint = module._resolve_pi05_model_root(deploy_cfg).resolve()
+        resolver = module._resolve_pi_model_root if policy_name == "Pi_0" else module._resolve_pi05_model_root
+        checkpoint = resolver(deploy_cfg).resolve()
         deploy_cfg = dict(deploy_cfg, model_path=str(checkpoint))
-        train = module._config.get_config(deploy_cfg.get("train_config_name", "pi05_aloha"))
-        action_space = "eef" if isinstance(train.data, module._config.LeRobotYamEEFDataConfig) else "joints"
+        if policy_name == "Pi_05":
+            deploy_cfg.setdefault("train_config_name", "pi05_aloha")
+        if not deploy_cfg.get("train_config_name"):
+            raise ValueError("Pi_0 requires train_config_name matching the checkpoint")
+        train = module._config.get_config(deploy_cfg["train_config_name"])
+        if bool(train.model.pi05) != (policy_name == "Pi_05"):
+            raise ValueError("policy_name does not match the training configuration architecture")
+        eef_data_class = getattr(module._config, "LeRobotYamEEFDataConfig", ())
+        action_space = "eef" if isinstance(train.data, eef_data_class) else "joints"
         action_horizon = int(train.model.action_horizon)
-        deploy_cfg.setdefault("train_config_name", "pi05_aloha")
         deploy_cfg.setdefault("repo_id", "1118")
     model = model_class_func(deploy_cfg)
     attach_model_identity(model, model_identity(

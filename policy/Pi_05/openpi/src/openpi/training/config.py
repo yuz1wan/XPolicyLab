@@ -709,12 +709,44 @@ def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
     )
 
 
+def _yam_pi0_from_mint_config(
+    task: yam_tasks.YamTask, name: str, checkpoint_subdir: str, mint_run: str = "mint-openpi-ego-streaming-3"
+) -> TrainConfig:
+    config = _yam_train_config(task)
+    workspace_root = pathlib.Path(__file__).resolve().parents[7]
+    assets_base_dir = os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", str(workspace_root / "assets/pi05"))
+    return dataclasses.replace(
+        config,
+        name=name,
+        model=pi0_config.Pi0Config(pi05=False, action_dim=32, action_horizon=task.action_horizon, max_token_len=96),
+        data=dataclasses.replace(
+            config.data,
+            assets=AssetsConfig(
+                assets_dir=str(pathlib.Path(assets_base_dir) / task.name),
+                asset_id=task.resolved_repo_id(),
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            os.environ.get(
+                "OPENPI_MINT_INIT_PARAMS",
+                "/mnt/bos/rhos-baige-general-beijing-prod/project/handzero-project/data-pipeline/checkpoints/"
+                f"{mint_run}/100000/params",
+            )
+        ),
+        assets_base_dir=assets_base_dir,
+        checkpoint_base_dir=os.environ.get(
+            "OPENPI_YAM_CHECKPOINT_BASE_DIR", str(workspace_root / "checkpoints" / checkpoint_subdir)
+        ),
+    )
+
+
 # Use `get_config` if you need to get a config by name in your code.
 _CONFIGS = [
     # YAM bimanual full fine-tuning from the released pi0.5 base checkpoint.
     # The dataset stores absolute joint targets. LeRobotAlohaDataConfig converts the
     # 12 arm joints to deltas and keeps the two normalized grippers absolute.
     *(_yam_train_config(task) for task in yam_tasks.ALL_TASKS.values()),
+    _yam_pi0_from_mint_config(yam_tasks.TASK_YAM_0004, "pi0_yam_task_0004_from_mint", "pi0-task4-joints"),
     TrainConfig(
         name="pi05_yam_green_block_circle",
         model=pi0_config.Pi0Config(pi05=True),

@@ -709,6 +709,58 @@ def _yam_train_config(task: yam_tasks.YamTask) -> TrainConfig:
     )
 
 
+def _yam_multitask_train_config(task: yam_tasks.YamMultiTask) -> TrainConfig:
+    """Joint fine-tuning over one multi-instruction YAM dataset.
+
+    Same recipe as the single-task YAM configs — pi05_base full fine-tuning, 50-step
+    horizon, AdamW, EMA 0.99 — with two deliberate differences: every prompt comes
+    from the dataset's own task row (no `default_prompt` fallback, so a missing task
+    row fails loudly instead of training on a wrong instruction), and the cosine
+    decay spans the whole run instead of ending at the single-task 30k default.
+    """
+    return TrainConfig(
+        name=task.name,
+        model=pi0_config.Pi0Config(pi05=True, action_horizon=task.action_horizon),
+        data=LeRobotAlohaDataConfig(
+            repo_id=task.resolved_repo_id(),
+            default_prompt=None,
+            use_delta_joint_actions=True,
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(
+                inputs=[
+                    _transforms.RepackTransform(
+                        {
+                            "images": {
+                                "cam_high": "observation.images.cam_high",
+                                "cam_left_wrist": "observation.images.cam_left_wrist",
+                                "cam_right_wrist": "observation.images.cam_right_wrist",
+                            },
+                            "state": task.state_key,
+                            "actions": task.action_key,
+                            "prompt": "prompt",
+                        }
+                    )
+                ]
+            ),
+            base_config=DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            os.environ.get("OPENPI_PI05_BASE_PARAMS", "gs://openpi-assets/checkpoints/pi05_base/params")
+        ),
+        lr_schedule=_optimizer.CosineDecaySchedule(
+            peak_lr=task.peak_lr, decay_lr=task.decay_lr, decay_steps=task.num_train_steps
+        ),
+        assets_base_dir=os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", "./assets"),
+        checkpoint_base_dir=os.environ.get("OPENPI_YAM_CHECKPOINT_BASE_DIR", "./checkpoints"),
+        batch_size=task.batch_size,
+        num_train_steps=task.num_train_steps,
+        num_workers=int(os.environ.get("OPENPI_YAM_NUM_WORKERS", "16")),
+        save_interval=5_000,
+        keep_period=10_000,
+        fsdp_devices=1,
+    )
+
+
 def _yam_pi0_from_mint_config(
     task: yam_tasks.YamTask, name: str, checkpoint_subdir: str, mint_run: str = "mint-openpi-ego-streaming-3"
 ) -> TrainConfig:
@@ -746,6 +798,7 @@ _CONFIGS = [
     # The dataset stores absolute joint targets. LeRobotAlohaDataConfig converts the
     # 12 arm joints to deltas and keeps the two normalized grippers absolute.
     *(_yam_train_config(task) for task in yam_tasks.ALL_TASKS.values()),
+    *(_yam_multitask_train_config(task) for task in yam_tasks.MULTITASK_TASKS.values()),
     _yam_pi0_from_mint_config(yam_tasks.TASK_YAM_0004, "pi0_yam_task_0004_from_mint", "pi0-task4-joints"),
     TrainConfig(
         name="pi05_yam_green_block_circle",

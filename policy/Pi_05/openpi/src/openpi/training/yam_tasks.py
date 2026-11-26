@@ -21,6 +21,8 @@ class YamTask:
     delta_mask: tuple[bool, ...] = (True,) * 6 + (False,) + (True,) * 6 + (False,)
     state_key: str = "observation.state"
     action_key: str = "action"
+    project: str = "rhospolicy-pi05"
+    entity: str = "HandZero"
 
     @property
     def task_id(self) -> int:
@@ -121,3 +123,58 @@ EEF_TASKS = {task.name: task for task in (
     TASK_YAM_0008_EEF, TASK_YAM_0008_EEF_60HZ, TASK_YAM_0015_EEF,
 )}
 ALL_TASKS = {**TASKS, **EEF_TASKS}
+
+
+@dataclass(frozen=True)
+class YamMultiTask:
+    """Joint fine-tuning over many instructions held in one LeRobot dataset.
+
+    The prompt of every frame comes from the dataset's own task row, so this record
+    carries no single prompt and deliberately has no numeric `task_id`: the member
+    tasks are listed in the conversion manifest and the versioned task table.
+    """
+
+    name: str
+    repo_id: str
+    task_table: str
+    task_count: int
+    dataset_tag: str
+    # Joint runs use a 4x larger global batch than the single-task recipe. openpi's own
+    # batch-256 configs (pi05_libero, pi05 DROID) pair that batch with peak_lr 5e-5, so
+    # this follows the model authors rather than the batch-64 YAM value. The 10:1
+    # peak-to-floor ratio is unchanged.
+    peak_lr: float = 5e-5
+    decay_lr: float = 5e-6
+    project: str = "GM1k"
+    entity: str = "rhos-ai"
+    num_train_steps: int = 100_000
+    batch_size: int = 256
+    action_horizon: int = 50
+    action_hz: int = 30
+    action_space: str = "joints"
+    state_space: str = "joints"
+    outcome: str = "success"
+    delta_mask: tuple[bool, ...] = (True,) * 6 + (False,) + (True,) * 6 + (False,)
+    state_key: str = "observation.state"
+    action_key: str = "action"
+
+    def resolved_repo_id(self) -> str:
+        return os.environ.get(
+            "OPENPI_LEROBOT_REPO_ID",
+            os.environ.get("OPENPI_YAM_DATA_REPO_ID", os.environ.get("OPENPI_DATA_REPO_ID", self.repo_id)),
+        )
+
+    def assets_dir(self) -> Path:
+        return (Path(os.environ.get("OPENPI_YAM_ASSETS_BASE_DIR", "./assets")) / self.name).resolve()
+
+
+# 100 TASK-TEL instructions selected on 2026-11-13; see the RhOSPolicy task table at
+# configs/tasks/yam_tel_100/tasks.json for ids, English prompts and selection evidence.
+TASK_YAM_TEL100 = YamMultiTask(
+    name="pi05_yam_tel100_joint",
+    repo_id="rhospolicy/yam-tel100-joint",
+    task_table="configs/tasks/yam_tel_100/tasks.json",
+    task_count=100,
+    dataset_tag="task-tel-100",
+)
+MULTITASK_TASKS = {task.name: task for task in (TASK_YAM_TEL100,)}

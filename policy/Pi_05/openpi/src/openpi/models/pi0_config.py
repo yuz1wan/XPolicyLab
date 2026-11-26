@@ -34,6 +34,12 @@ class Pi0Config(_model.BaseModelConfig):
 
     pytorch_compile_mode: str | None = "max-autotune"
 
+    # PI-R2 is opt-in; "flow" preserves native PI0/PI0.5 training exactly.
+    pir2_mode: str = "flow"
+    pir2_d_max: int = 5
+    pir2_standard_flow_probability: float = 0.2
+    pir2_tau_jitter: float = 0.05
+
     def __post_init__(self):
         if self.max_token_len is None:
             object.__setattr__(self, "max_token_len", 200 if self.pi05 else 48)
@@ -46,6 +52,16 @@ class Pi0Config(_model.BaseModelConfig):
                 "max-autotune",
                 "max-autotune-no-cudagraphs",
             ]
+        if self.pir2_mode not in {"flow", "rtc", "staircase"}:
+            raise ValueError(f"pir2_mode must be flow, rtc, or staircase, got {self.pir2_mode!r}")
+        if self.pir2_d_max < 1:
+            raise ValueError("pir2_d_max must be at least 1")
+        if self.pir2_mode != "flow" and 2 * self.pir2_d_max >= self.action_horizon:
+            raise ValueError("PI-R2 requires 2 * pir2_d_max < action_horizon")
+        if not 0.0 <= self.pir2_standard_flow_probability <= 1.0:
+            raise ValueError("pir2_standard_flow_probability must be in [0, 1]")
+        if self.pir2_tau_jitter < 0.0:
+            raise ValueError("pir2_tau_jitter must be non-negative")
 
     @property
     @override
